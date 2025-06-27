@@ -1,0 +1,610 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code.
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*.
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+```{r}
+# Load necessary libraries
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(car)
+library(e1071)
+library(lmtest)
+library(lubridate)
+library(mediation)
+library(tidyverse)
+library(MASS)
+library(nnet)
+library(car)
+
+
+data <- read_excel("rfiledata9909990990999909090909_.xlsx")
+
+
+str(data)
+
+
+data$Shares <- as.numeric(data$Shares)
+data$Engagement_rate <- as.numeric(data$Engagement_rate)
+
+# Log transform the engagement rate
+data$log_engagement_rate <- log(data$Engagement_rate + 1)
+
+# Summary statistics
+summary(data)
+
+# Correlation matrix
+correlation_matrix <- cor(data %>% select(No.of_followers, Likes, Shares, Comments, Engagement_rate, log_engagement_rate, Video,Environmental_harm, Link_for_action), use = "complete.obs")
+print(correlation_matrix)
+corrplot(correlation_matrix, method = "circle")
+
+# Industry-wise engagement rate
+industry_engagement <- data %>%
+  group_by(Industry) %>%
+  summarise(avg_engagement_rate = mean(Engagement_rate, na.rm = TRUE))
+
+# Plot industry-wise engagement rate
+ggplot(industry_engagement, aes(x = reorder(Industry, -avg_engagement_rate), y = avg_engagement_rate)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  coord_flip() +
+  labs(title = "Average Engagement Rate by Industry", x = "Industry", y = "Average Engagement Rate")
+
+# Environmental harm and engagement rate
+env_harm_engagement <- data %>%
+  group_by(Environmental_harm) %>%
+  summarise(avg_engagement_rate = mean(Engagement_rate, na.rm = TRUE))
+
+# Plot environmental harm and engagement rate
+ggplot(env_harm_engagement, aes(x = factor(Environmental_harm), y = avg_engagement_rate, fill = factor(Environmental_harm))) +
+  geom_bar(stat = "identity") +
+  labs(title = "Engagement Rate by Environmental Harm", x = "Environmental Harm", y = "Average Engagement Rate") +
+  scale_fill_discrete(name = "Environmental Harm", labels = c("Less Harm", "More Harm"))
+
+# Engagement rate vs number of followers scatter plot
+ggplot(data, aes(x = No.of_followers, y = Engagement_rate)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", color = "red") +
+  labs(title = "Engagement Rate vs Number of Followers", x = "Number of Followers", y = "Engagement Rate")
+
+# Displaying the plots
+print(industry_engagement)
+print(env_harm_engagement)
+
+```
+```{r Skewness/Kurtosis}
+# Density Plot of log-transformed Engagement_rate
+plot(density(data$log_Engagement_rate, na.rm = TRUE), main = "Density Plot of Log-Transformed Engagement Rate", xlab = "Log-Transformed Engagement Rate", col = "purple")
+```
+```{r}
+# Load necessary libraries
+library(readxl)
+library(tidyverse)
+library(e1071)  
+
+
+data <- read_excel("C:/Users/91996/Downloads/rfiledata99099909909999.xlsx")
+
+# Compute skewness of original Engagement_rate
+skewness_value <- skewness(data$Engagement_rate, na.rm = TRUE)
+print(paste("Skewness of Engagement_rate:", skewness_value))
+
+# Visualize the distribution of original Engagement_rate
+# Histogram
+hist(data$Engagement_rate, main = "Histogram of Engagement Rate", xlab = "Engagement Rate", breaks = 30, col = "blue")
+
+# Density Plot
+plot(density(data$Engagement_rate, na.rm = TRUE), main = "Density Plot of Engagement Rate", xlab = "Engagement Rate", col = "red")
+
+# Log transform the Engagement_rate (add 1 to avoid log(0))
+data <- data %>%
+  mutate(log_Engagement_rate = log(Engagement_rate + 1))
+
+# Compute skewness of the log-transformed Engagement_rate
+log_skewness_value <- skewness(data$log_Engagement_rate, na.rm = TRUE)
+print(paste("Skewness of log-transformed Engagement_rate:", log_skewness_value))
+
+# Visualize the distribution of the log-transformed Engagement_rate
+# Histogram
+hist(data$log_Engagement_rate, main = "Histogram of Log-Transformed Engagement Rate", xlab = "Log-Transformed Engagement Rate", breaks = 30, col = "green")
+
+# Density Plot
+plot(density(data$log_Engagement_rate, na.rm = TRUE), main = "Density Plot of Log-Transformed Engagement Rate", xlab = "Log-Transformed Engagement Rate", col = "purple")
+
+```
+
+```{r}
+levels(data$CSR_motive)
+
+```
+```{r}
+# Log transform the Engagement_rate (add 1 to avoid log(0))
+data <- data %>%
+  mutate(log_Engagement_rate = log(Engagement_rate + 1))
+
+# Descriptive statistics by Appeal
+appeal_stats <- data %>%
+  group_by(Appeal) %>%
+  summarise(
+    mean_log_engagement = mean(log_Engagement_rate, na.rm = TRUE),
+    median_log_engagement = median(log_Engagement_rate, na.rm = TRUE),
+    sd_log_engagement = sd(log_Engagement_rate, na.rm = TRUE)
+  )
+
+print(appeal_stats)
+
+# Descriptive statistics by CSR Motive
+csr_motive_stats <- data %>%
+  group_by(CSR_motive) %>%
+  summarise(
+    mean_log_engagement = mean(log_Engagement_rate, na.rm = TRUE),
+    median_log_engagement = median(log_Engagement_rate, na.rm = TRUE),
+    sd_log_engagement = sd(log_Engagement_rate, na.rm = TRUE)
+  )
+
+print(csr_motive_stats)
+
+```
+```{r}
+# Count the total number of emotional and rational appeals
+overall_appeal_count <- data %>%
+  group_by(Appeal) %>%
+  summarise(count = n())
+
+print(overall_appeal_count)
+
+```
+```{r}
+# Count CSR motives by appeal
+csr_motive_by_appeal <- data %>%
+  group_by(Appeal, CSR_motive) %>%
+  summarise(count = n())
+
+print(csr_motive_by_appeal)
+
+```
+
+
+
+
+```{r}
+data09 <- read_excel("rfiledata9909990990999909090909_.xlsx")
+# Subset only numeric columns for correlation analysis
+# Log transform the engagement rate
+data09 <- data09 %>%
+  mutate(log_engagement_rate = log(Engagement_rate + 1))  # Adding 1 to avoid log(0)
+
+numeric_columns <- data09 %>% select_if(is.numeric)
+
+
+
+# Calculate correlation matrix
+cor_matrix <- cor(numeric_columns, use = "complete.obs")
+print(cor_matrix)
+
+# Visualize correlation matrix
+corrplot::corrplot(cor_matrix, method = "circle")
+
+
+```
+
+
+
+
+
+
+
+```{r}
+# Graphical Analysis
+ggplot(data, aes(x = Industry, y = log_engagement_rate, fill = as.factor(Environmental_harm))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(title = "Engagement Rate by Industry and Environmental Harm",
+       x = "Industry",
+       y = "Log Engagement Rate",
+       fill = "Environmental Harm")
+```
+
+```{r}
+# Plot for Industry vs. Log Engagement Rate
+ggplot(data, aes(x = Industry, y = log_engagement_rate, fill = Industry)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(title = "Engagement Rate by Industry",
+       x = "Industry",
+       y = "Log Engagement Rate",
+       fill = "Industry") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+```
+
+```{r Environmental_harm descriptives}
+# Plot for Environmental Harm vs. Log Engagement Rate
+ggplot(data, aes(x = as.factor(Environmental_harm), y = log_engagement_rate, fill = as.factor(Environmental_harm))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(title = "Engagement Rate by Environmental Harm",
+       x = "Environmental Harm",
+       y = "Log Engagement Rate",
+       fill = "Environmental Harm")
+```
+
+```{r}
+
+library(lmtest)
+library(car)
+library(MASS)
+library(dplyr)
+library(nnet)
+library(mediation)
+
+
+
+
+```
+
+
+
+```{r Homoscedacity test}
+# Fit a linear model
+modelhomoscedacity <- lm(log_engagement_rate ~ Appeal + Video + Link_for_action + Environmental_harm, data = data09)
+
+# Breusch-Pagan test
+bptest(modelhomoscedacity)
+
+```
+
+```{r VIF model}
+# Calculate VIF
+vif(modelhomoscedacity)
+
+```
+
+```{r Normality test}
+# Shapiro-Wilk test
+shapiro.test(residuals(modelhomoscedacity))
+
+```
+
+```{r}
+# Shapiro-Wilk test
+shapiro.test(residuals(modelhomoscedacity))
+
+```
+
+
+
+```{r correlation matrix99}
+data09 <- read_excel("rfiledata9909990990999909090909_.xlsx")
+
+data09 <- data09 %>%
+  
+numeric_columns <- data09 %>% select_if(is.numeric)
+
+
+
+# Calculate correlation matrix
+cor_matrix <- cor(numeric_columns, use = "complete.obs")
+print(cor_matrix)
+
+# Visualize correlation matrix
+corrplot::corrplot(cor_matrix, method = "circle")
+
+
+
+```
+
+
+
+```
+
+```{r}
+# Convert appeal_type to a binary variable
+data09$appeal_numeric <- ifelse(data09$Appeal == "Emotional", 1, 0)
+
+
+print(data)
+
+# Robust regression
+
+model_robust0909_ <- rlm(log_engagement_rate ~ appeal_numeric + Video + Link_for_action + Environmental_harm, data = data09)
+
+summary(model_robust)
+```
+
+
+
+```{r}
+# Visualize correlation matrix
+corrplot::corrplot(cor_matrix, method = "circle")
+
+```
+
+```{r H1 - robust regression}
+# Convert appeal_type to a binary variable
+data$appeal_numeric <- ifelse(data$Appeal == "Emotional", 1, 0)
+
+# View the modified data frame
+print(data)
+
+# Robust regression
+
+model_robust <- rlm(log_engagement_rate ~ Appeal_numeric + Video + Link_for_action + Environmental_harm, data = data)
+
+# Summarize the model
+summary(model_robust)
+
+```
+
+```{r Negative binomial regression}
+# Negative binomial regression
+nb_model <- glm.nb(Engagement_rate ~ Appeal + Video + Link_for_action + Environmental_harm, data = data)
+summary(nb_model)
+
+```
+```{r t-tests}
+
+# Perform t-tests
+
+
+# t-test for appeal
+t_test_appeal <- t.test(log_engagement_rate ~ Appeal, data = data)
+print("T-test for Appeal:")
+print(t_test_appeal)
+
+# t-test for environmental harm
+t_test_environmental_harm <- t.test(log_engagement_rate ~ Environmental_harm, data = data)
+print("T-test for Environmental Harm:")
+print(t_test_environmental_harm)
+
+```
+
+```{r ANOVA}
+# Perform ANOVA for CSR_motive
+anova_motives <- aov(log_engagement_rate ~ CSR_motive, data = data)
+print("ANOVA for CSR Motives:")
+summary(anova_motives)
+```
+```{r Boxplot}
+#Boxplot of Log-Transformed Engagement Rate by Appeal
+ggplot(data, aes(x = Appeal, y = log_engagement_rate)) +
+  geom_boxplot() +
+  labs(title = "Log-Transformed Engagement Rate by CSR Appeal", y = "Log-Transformed Engagement Rate", x = "Appeal")
+
+```
+
+```{r Causal Mediation}
+# Fit the outcome model
+outcome_model0909 <- lm(log_engagement_rate ~ Appeal + CSR_motive_binary + Video + Link_for_action + Environmental_harm, data = data)
+
+
+mediation_result0909 <- mediate(mediator_model0909, outcome_model0909, treat = "Appeal", mediator = "CSR_motive_binary", boot = TRUE)
+summary(mediation_result0909)
+
+
+```
+```{r Baron & Kenny mediation step 1 & 3}
+step1_model18 <- lm(log_Engagement_rate ~ Appeal_numeric + Video + Link_for_action + Environmental_harm, data = rfiledata9909990990999909090909_)
+summary(step1_model18)
+
+rfiledata9909990990999909090909_ <- rfiledata9909990990999909090909_ %>%
+  mutate(
+    Appeal_numeric = ifelse(Appeal == "Emotional", 1, 0),
+    CSR_motive_factor = factor(CSR_motive, levels = c("Self", "Public", "Both")),
+    CSR_motive_num = as.numeric(CSR_motive_factor)  # Convert CSR_motive to numeric for Step 3
+  )
+
+```
+```{r H3 Baron & Kenny step 2}
+data <- data %>%
+  mutate(
+    Appeal_numeric = ifelse(Appeal == "Emotional", 1, 0),
+    CSR_motive_factor = factor(CSR_motive, levels = c("Self", "Public", "Both"))
+  )
+
+# Fit multinomial logistic regression model
+step2_model9909090909  <- multinom(CSR_motive_factor ~ Appeal_numeric + Video + Link_for_action + Environmental_harm, data = data)
+summary(step2_model9909090909)
+```
+```
+
+
+
+
+
+```
+
+
+
+```
+
+```{r H2 multinomial}
+
+# Convert categorical variables to numerical
+data <- data %>%
+  mutate(
+    Appeal_numeric = ifelse(Appeal == "Emotional", 1, 0),
+    CSR_motive_factor = factor(CSR_motive, levels = c("Self", "Public", "Both"))
+  )
+
+# Fit multinomial logistic regression model
+model_h2 <- multinom(CSR_motive_factor ~ Appeal_numeric + Video + Link_for_action + Environmental_harm, data = data)
+summary(model_h2)
+
+
+```
+
+
+```
+
+```
+
+
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
+```
+
+
+```
+
+
+
+```
+
+```{r}
+data$CSR_motive_binary <- ifelse(data$CSR_motive == "Public", 1, 0)
+
+```
+
+
+```
+
+
+
+
+```
+
+
+```
+
+
+
+`
+
+```
+
+```{r}
+
+
+# Multinomial regression model
+step2_model_multinom <- multinom(CSR_motive ~ Appeal + Video + Link_for_action + Environmental_harm, data = data)
+
+# Summary of the model
+summary(step2_model_multinom)
+
+```
+
+```{r H3 - Step 2}
+data <- data %>%
+  mutate(
+    Appeal_numeric = ifelse(Appeal == "Emotional", 1, 0),
+    CSR_motive_factor = factor(CSR_motive, levels = c("Self", "Public", "Both"))
+  )
+
+# Fit multinomial logistic regression model
+step2_model9909090909  <- multinom(CSR_motive_factor ~ Appeal_numeric + Video + Link_for_action + Environmental_harm, data = data)
+summary(step2_model9909090909)
+```
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(nnet)
+
+
+rfiledata99009990990999909090909_ <- read.csv("path_to_your_file.csv")
+
+# Convert categorical variables to numerical
+rfiledata99009990990999909090909_ <- rfiledata99009990990999909090909_ %>%
+  mutate(
+    Appeal_numeric = ifelse(Appeal == "Emotional", 1, 0),
+    CSR_motive_factor = factor(CSR_motive, levels = c("Self", "Public", "Both"))
+  )
+
+# Fit multinomial logistic regression model
+model_h2 <- multinom(CSR_motive_factor ~ Appeal_numeric + Video + Link_for_action + Environmental_harm, data = rfiledata99009990990999909090909_)
+summary(model_h2)
+
+
+```
+
+```{r H2 }
+
+
+# Convert categorical variables to numerical
+data <- data %>%
+  mutate(
+    Appeal_numeric = ifelse(Appeal == "Emotional", 1, 0),
+    CSR_motive_factor = factor(CSR_motive, levels = c("Self", "Public", "Both"))
+  )
+
+# Fit multinomial logistic regression model
+model_h2 <- multinom(CSR_motive_factor ~ Appeal_numeric + Video + Link_for_action + Environmental_harm, data = data)
+summary(model_h2)
+
+
+```
+
+```{r H3 - Step 1&3}
+step1_model18 <- lm(log_Engagement_rate ~ Appeal_numeric + Video + Link_for_action + Environmental_harm, data = rfiledata9909990990999909090909_)
+summary(step1_model18)
+
+rfiledata9909990990999909090909_ <- rfiledata9909990990999909090909_ %>%
+  mutate(
+    Appeal_numeric = ifelse(Appeal == "Emotional", 1, 0),
+    CSR_motive_factor = factor(CSR_motive, levels = c("Self", "Public", "Both")),
+    CSR_motive_num = as.numeric(CSR_motive_factor)  # Convert CSR_motive to numeric for Step 3
+  )
+
+
+# Step 3: Effect of CSR_motive on Log_Engagement_rate, controlling for Appeal and other covariates
+step3_model18 <- lm(log_Engagement_rate ~ CSR_motive_num + Appeal_numeric + Video + Link_for_action + Environmental_harm, data = rfiledata9909990990999909090909_)
+summary(step3_model18)
+```
+
+```
+```
+
+
+
+```
+
+
+
+```{r}
+# Convert necessary columns to factors
+data$Appeal <- as.factor(data$Appeal)
+data$CSR_motive <- as.factor(data$CSR_motive)
+# Pair plot for linearity
+
+# Subset only numeric columns
+numeric_columns <- data %>% select_if(is.numeric)
+
+# Pair plot for linearity
+pairs(numeric_columns)
+
+# Homoscedasticity
+model <- lm(Log_Engagement_rate ~ Likes + Shares + Comments + Video, data = data)
+plot(model$fitted.values, rstandard(model), xlab = "Fitted values", ylab = "Residuals")
+abline(h = 0, col = "red")
+```
+
